@@ -75,10 +75,11 @@ export async function POST(request: NextRequest) {
     await sql`
       INSERT INTO "Transaction" (
         id, "memberId", "memberName", phone, amount,
-        "transactionReference", "systemReference", "createdAt"
+        "transactionReference", "systemReference", type, description, "createdAt"
       ) VALUES (
         ${transactionId}, ${id}, ${memberName}, ${phone},
-        ${registrationAmount || 0}, ${transactionReference}, ${systemReference}, ${now}
+        ${registrationAmount || 0}, ${transactionReference}, ${systemReference},
+        'registration', 'Member registration fee', ${now}
       )
     `
 

@@ -24,14 +24,18 @@ export interface Member {
   updatedAt: Date
 }
 
+export type TransactionType = 'registration' | 'donation' | 'contribution'
+
 export interface Transaction {
   id: string
-  memberId: string
+  memberId: string | null
   memberName: string
   phone: string
   amount: number
   transactionReference: string
   systemReference: string
+  type: TransactionType
+  description: string | null
   createdAt: Date
 }
 
