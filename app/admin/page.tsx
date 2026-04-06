@@ -4,31 +4,87 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { getMembers, getTransactions } from '@/lib/store'
-import { Member, Transaction } from '@/lib/types'
-import { Users, Clock, CheckCircle, XCircle, CreditCard, ArrowRight } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Users, Clock, CheckCircle, CreditCard, ArrowRight } from 'lucide-react'
+
+interface DashboardStats {
+  total: number
+  pending: number
+  approved: number
+  rejected: number
+  totalAmount: number
+}
+
+interface PendingMember {
+  id: string
+  firstName: string
+  middleName: string | null
+  surname: string
+  phone: string
+  createdAt: string
+}
 
 export default function AdminDashboardPage() {
-  const [members, setMembers] = useState<Member[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [recentPending, setRecentPending] = useState<PendingMember[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    setMembers(getMembers())
-    setTransactions(getTransactions())
+    async function fetchDashboardData() {
+      try {
+        const response = await fetch('/api/admin/dashboard')
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to load dashboard')
+        }
+
+        setStats(result.stats)
+        setRecentPending(result.recentPending)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDashboardData()
   }, [])
 
-  const stats = {
-    total: members.length,
-    pending: members.filter(m => m.status === 'pending').length,
-    approved: members.filter(m => m.status === 'approved').length,
-    rejected: members.filter(m => m.status === 'rejected').length,
-    totalAmount: transactions.reduce((sum, t) => sum + t.amount, 0),
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">Loading dashboard data...</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
   }
 
-  const recentPending = members
-    .filter(m => m.status === 'pending')
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5)
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-destructive">{error}</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -49,7 +105,7 @@ export default function AdminDashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-foreground">{stats.total}</p>
+            <p className="text-2xl font-bold text-foreground">{stats?.total || 0}</p>
           </CardContent>
         </Card>
 
@@ -61,7 +117,7 @@ export default function AdminDashboardPage() {
             <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
+            <p className="text-2xl font-bold text-amber-600">{stats?.pending || 0}</p>
           </CardContent>
         </Card>
 
@@ -73,7 +129,7 @@ export default function AdminDashboardPage() {
             <CheckCircle className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-primary">{stats.approved}</p>
+            <p className="text-2xl font-bold text-primary">{stats?.approved || 0}</p>
           </CardContent>
         </Card>
 
@@ -86,7 +142,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-foreground">
-              {stats.totalAmount.toLocaleString()} SLE
+              {(stats?.totalAmount || 0).toLocaleString()} SLE
             </p>
           </CardContent>
         </Card>

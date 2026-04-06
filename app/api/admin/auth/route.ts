@@ -1,9 +1,58 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
-import { cookies } from "next/headers"
+import { NextRequest, NextResponse } from 'next/server'
+import { sql } from '@/lib/db'
+import bcrypt from 'bcryptjs'
+import { cookies } from 'next/headers'
 
-// POST - Admin login
+const SESSION_COOKIE_NAME = 'admin_session'
+const SESSION_DURATION = 24 * 60 * 60 * 1000 // 24 hours
+
+// Simple session token generation
+function generateSessionToken(): string {
+  return crypto.randomUUID() + '-' + Date.now().toString(36)
+}
+
+// In-memory session store (in production, use a database or Redis)
+const sessions = new Map<string, { adminId: string; email: string; expiresAt: Date }>()
+
+// GET - Check if admin is authenticated
+export async function GET() {
+  try {
+    const cookieStore = await cookies()
+    const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value
+
+    if (!sessionToken) {
+      return NextResponse.json(
+        { authenticated: false, error: 'No session' },
+        { status: 401 }
+      )
+    }
+
+    const session = sessions.get(sessionToken)
+
+    if (!session || session.expiresAt < new Date()) {
+      sessions.delete(sessionToken)
+      return NextResponse.json(
+        { authenticated: false, error: 'Session expired' },
+        { status: 401 }
+      )
+    }
+
+    return NextResponse.json({
+      authenticated: true,
+      admin: {
+        email: session.email,
+      },
+    })
+  } catch (error) {
+    console.error('Auth check error:', error)
+    return NextResponse.json(
+      { authenticated: false, error: 'Auth check failed' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST - Login
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -11,165 +60,88 @@ export async function POST(request: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: 'Email and password are required' },
         { status: 400 }
       )
     }
 
-    // Find admin user
-    const admin = await prisma.adminUser.findUnique({
-      where: { email },
-    })
+    // Find admin by email
+    const [admin] = await sql`
+      SELECT id, email, password, name
+      FROM "AdminUser"
+      WHERE email = ${email}
+    `
 
     if (!admin) {
       return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 }
-      )
-    }
-
-    // Check if account is active
-    if (!admin.isActive) {
-      return NextResponse.json(
-        { error: "Account is disabled" },
+        { error: 'Invalid credentials' },
         { status: 401 }
       )
     }
 
     // Verify password
-    const isValidPassword = await bcrypt.compare(password, admin.passwordHash)
+    const isValidPassword = await bcrypt.compare(password, admin.password)
 
     if (!isValidPassword) {
       return NextResponse.json(
-        { error: "Invalid credentials" },
+        { error: 'Invalid credentials' },
         { status: 401 }
       )
     }
 
-    // Update last login
-    await prisma.adminUser.update({
-      where: { id: admin.id },
-      data: { lastLogin: new Date() },
+    // Create session
+    const sessionToken = generateSessionToken()
+    const expiresAt = new Date(Date.now() + SESSION_DURATION)
+
+    sessions.set(sessionToken, {
+      adminId: admin.id,
+      email: admin.email,
+      expiresAt,
     })
 
-    // Create session token (simple approach - in production use JWT or proper sessions)
-    const sessionToken = Buffer.from(
-      JSON.stringify({
-        id: admin.id,
-        email: admin.email,
-        role: admin.role,
-        exp: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
-      })
-    ).toString("base64")
-
-    // Set cookie
+    // Set session cookie
     const cookieStore = await cookies()
-    cookieStore.set("admin_session", sessionToken, {
+    cookieStore.set(SESSION_COOKIE_NAME, sessionToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 24 * 60 * 60, // 24 hours
-      path: "/",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      expires: expiresAt,
+      path: '/',
     })
 
     return NextResponse.json({
       success: true,
       admin: {
-        id: admin.id,
         email: admin.email,
-        firstName: admin.firstName,
-        lastName: admin.lastName,
-        role: admin.role,
+        name: admin.name,
       },
     })
   } catch (error) {
-    console.error("Error during login:", error)
+    console.error('Login error:', error)
     return NextResponse.json(
-      { error: "Authentication failed" },
+      { error: 'Login failed' },
       { status: 500 }
     )
   }
 }
 
-// DELETE - Admin logout
+// DELETE - Logout
 export async function DELETE() {
   try {
     const cookieStore = await cookies()
-    cookieStore.delete("admin_session")
+    const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value
+
+    if (sessionToken) {
+      sessions.delete(sessionToken)
+    }
+
+    cookieStore.delete(SESSION_COOKIE_NAME)
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error during logout:", error)
+    console.error('Logout error:', error)
     return NextResponse.json(
-      { error: "Logout failed" },
-      { status: 500 }
-    )
-  }
-}
-
-// GET - Check auth status
-export async function GET() {
-  try {
-    const cookieStore = await cookies()
-    const sessionToken = cookieStore.get("admin_session")
-
-    if (!sessionToken) {
-      return NextResponse.json(
-        { authenticated: false },
-        { status: 401 }
-      )
-    }
-
-    try {
-      const session = JSON.parse(
-        Buffer.from(sessionToken.value, "base64").toString()
-      )
-
-      // Check if session is expired
-      if (session.exp < Date.now()) {
-        cookieStore.delete("admin_session")
-        return NextResponse.json(
-          { authenticated: false, error: "Session expired" },
-          { status: 401 }
-        )
-      }
-
-      // Fetch fresh admin data
-      const admin = await prisma.adminUser.findUnique({
-        where: { id: session.id },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          isActive: true,
-        },
-      })
-
-      if (!admin || !admin.isActive) {
-        cookieStore.delete("admin_session")
-        return NextResponse.json(
-          { authenticated: false },
-          { status: 401 }
-        )
-      }
-
-      return NextResponse.json({
-        authenticated: true,
-        admin,
-      })
-    } catch {
-      cookieStore.delete("admin_session")
-      return NextResponse.json(
-        { authenticated: false },
-        { status: 401 }
-      )
-    }
-  } catch (error) {
-    console.error("Error checking auth:", error)
-    return NextResponse.json(
-      { error: "Auth check failed" },
+      { error: 'Logout failed' },
       { status: 500 }
     )
   }

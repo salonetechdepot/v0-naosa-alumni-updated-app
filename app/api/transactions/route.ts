@@ -1,117 +1,71 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from 'next/server'
+import { sql } from '@/lib/db'
 
 // GET all transactions
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const status = searchParams.get("status")
-    const type = searchParams.get("type")
-    const memberId = searchParams.get("memberId")
+    const transactions = await sql`
+      SELECT 
+        id, "memberId", "memberName", phone, amount,
+        "transactionReference", "systemReference", "createdAt"
+      FROM "Transaction"
+      ORDER BY "createdAt" DESC
+    `
 
-    const where: any = {}
-
-    if (status) {
-      where.status = status
-    }
-
-    if (type) {
-      where.type = type
-    }
-
-    if (memberId) {
-      where.memberId = memberId
-    }
-
-    const transactions = await prisma.transaction.findMany({
-      where,
-      include: {
-        member: {
-          select: {
-            id: true,
-            memberId: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    })
-
-    return NextResponse.json(transactions)
+    return NextResponse.json({ transactions })
   } catch (error) {
-    console.error("Error fetching transactions:", error)
+    console.error('Error fetching transactions:', error)
     return NextResponse.json(
-      { error: "Failed to fetch transactions" },
+      { error: 'Failed to fetch transactions' },
       { status: 500 }
     )
   }
 }
 
-// POST create new transaction
+// POST create a new transaction (usually done automatically with member registration)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
     const {
       memberId,
-      type,
+      memberName,
+      phone,
       amount,
-      description,
-      paymentMethod,
-      referenceNumber,
-      notes,
+      transactionReference,
+      systemReference,
     } = body
 
-    // Verify member exists
-    const member = await prisma.member.findUnique({
-      where: { id: memberId },
-    })
-
-    if (!member) {
+    // Validate required fields
+    if (!memberId || !memberName || !phone || !transactionReference || !systemReference) {
       return NextResponse.json(
-        { error: "Member not found" },
-        { status: 404 }
+        { error: 'Missing required fields' },
+        { status: 400 }
       )
     }
 
-    // Generate transaction ID
-    const transactionCount = await prisma.transaction.count()
-    const transactionId = `TXN-${String(transactionCount + 1).padStart(6, "0")}`
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
 
-    const transaction = await prisma.transaction.create({
-      data: {
-        transactionId,
-        memberId,
-        type,
-        amount,
-        description,
-        paymentMethod,
-        referenceNumber,
-        notes,
-        status: "pending",
-      },
-      include: {
-        member: {
-          select: {
-            id: true,
-            memberId: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    })
+    await sql`
+      INSERT INTO "Transaction" (
+        id, "memberId", "memberName", phone, amount,
+        "transactionReference", "systemReference", "createdAt"
+      ) VALUES (
+        ${id}, ${memberId}, ${memberName}, ${phone},
+        ${amount || 0}, ${transactionReference}, ${systemReference}, ${now}
+      )
+    `
 
-    return NextResponse.json(transaction, { status: 201 })
+    const [transaction] = await sql`
+      SELECT * FROM "Transaction" WHERE id = ${id}
+    `
+
+    return NextResponse.json({ transaction }, { status: 201 })
   } catch (error) {
-    console.error("Error creating transaction:", error)
+    console.error('Error creating transaction:', error)
     return NextResponse.json(
-      { error: "Failed to create transaction" },
+      { error: 'Failed to create transaction' },
       { status: 500 }
     )
   }

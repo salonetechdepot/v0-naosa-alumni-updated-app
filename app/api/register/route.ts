@@ -1,117 +1,107 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from 'next/server'
+import { sql, generateSystemReference } from '@/lib/db'
 
-// POST - Public registration endpoint
+// Public registration endpoint
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
     const {
       firstName,
-      lastName,
+      middleName,
+      surname,
+      gender,
+      currentAddress,
+      admissionNumber,
+      dateOfEntry,
+      dateOfExit,
       email,
       phone,
-      address,
-      city,
-      state,
-      zipCode,
-      country,
-      membershipType,
-      occupation,
-      employer,
-      emergencyContactName,
-      emergencyContactPhone,
-      notes,
+      registrationAmount,
+      transactionReference,
     } = body
 
     // Validate required fields
-    if (!firstName || !lastName || !email || !membershipType) {
+    if (!firstName || !surname || !gender || !currentAddress || !dateOfEntry || !dateOfExit || !phone || !transactionReference) {
       return NextResponse.json(
-        { error: "First name, last name, email, and membership type are required" },
+        { error: 'Missing required fields. Please fill in all required fields.' },
         { status: 400 }
       )
     }
 
-    // Check if email already exists
-    const existingMember = await prisma.member.findUnique({
-      where: { email },
-    })
-
-    if (existingMember) {
+    // Validate gender
+    if (!['male', 'female'].includes(gender)) {
       return NextResponse.json(
-        { error: "A member with this email already exists. Please contact support if you need assistance." },
+        { error: 'Invalid gender value' },
         { status: 400 }
       )
     }
 
-    // Generate member ID
-    const memberCount = await prisma.member.count()
-    const memberId = `NAOSA-${String(memberCount + 1).padStart(5, "0")}`
+    // Check for duplicate transaction reference
+    const existingTransaction = await sql`
+      SELECT id FROM "Transaction" WHERE "transactionReference" = ${transactionReference}
+    `
 
-    // Create the member
-    const member = await prisma.member.create({
-      data: {
-        memberId,
-        firstName,
-        lastName,
-        email,
-        phone,
-        address,
-        city,
-        state,
-        zipCode,
-        country,
-        membershipType,
-        occupation,
-        employer,
-        emergencyContactName,
-        emergencyContactPhone,
-        notes,
-        status: "pending",
-      },
-    })
-
-    // Create initial membership fee transaction
-    const membershipFees: Record<string, number> = {
-      regular: 50,
-      student: 25,
-      senior: 35,
-      family: 75,
-      lifetime: 500,
+    if (existingTransaction.length > 0) {
+      return NextResponse.json(
+        { error: 'This transaction reference has already been used. Please provide a unique transaction reference.' },
+        { status: 400 }
+      )
     }
 
-    const fee = membershipFees[membershipType] || 50
-    const transactionCount = await prisma.transaction.count()
-    const transactionId = `TXN-${String(transactionCount + 1).padStart(6, "0")}`
+    const systemReference = generateSystemReference()
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
 
-    await prisma.transaction.create({
-      data: {
-        transactionId,
-        memberId: member.id,
-        type: "membership_fee",
-        amount: fee,
-        description: `${membershipType.charAt(0).toUpperCase() + membershipType.slice(1)} membership registration fee`,
-        status: "pending",
-      },
-    })
+    // Insert member
+    await sql`
+      INSERT INTO "Member" (
+        id, "firstName", "middleName", surname, gender, "currentAddress",
+        "admissionNumber", "dateOfEntry", "dateOfExit", email, phone,
+        "registrationAmount", "transactionReference", "systemReference",
+        status, "createdAt", "updatedAt"
+      ) VALUES (
+        ${id}, ${firstName}, ${middleName || null}, ${surname}, ${gender},
+        ${currentAddress}, ${admissionNumber || null}, ${dateOfEntry}, ${dateOfExit},
+        ${email || null}, ${phone}, ${registrationAmount || 0}, ${transactionReference},
+        ${systemReference}, 'pending', ${now}, ${now}
+      )
+    `
+
+    // Create transaction record
+    const transactionId = crypto.randomUUID()
+    const memberName = `${firstName} ${middleName || ''} ${surname}`.trim().replace(/\s+/g, ' ')
+
+    await sql`
+      INSERT INTO "Transaction" (
+        id, "memberId", "memberName", phone, amount,
+        "transactionReference", "systemReference", "createdAt"
+      ) VALUES (
+        ${transactionId}, ${id}, ${memberName}, ${phone},
+        ${registrationAmount || 0}, ${transactionReference}, ${systemReference}, ${now}
+      )
+    `
+
+    // Get the created member
+    const [member] = await sql`
+      SELECT 
+        id, "firstName", "middleName", surname, gender, 
+        "currentAddress", "admissionNumber", "dateOfEntry", "dateOfExit",
+        email, phone, "registrationAmount", "transactionReference", 
+        "systemReference", status, "createdAt", "updatedAt"
+      FROM "Member"
+      WHERE id = ${id}
+    `
 
     return NextResponse.json({
       success: true,
-      message: "Registration successful! You will receive a confirmation email shortly.",
-      member: {
-        id: member.id,
-        memberId: member.memberId,
-        firstName: member.firstName,
-        lastName: member.lastName,
-        email: member.email,
-        membershipType: member.membershipType,
-        status: member.status,
-      },
+      message: 'Registration submitted successfully',
+      member,
     }, { status: 201 })
   } catch (error) {
-    console.error("Error during registration:", error)
+    console.error('Registration error:', error)
     return NextResponse.json(
-      { error: "Registration failed. Please try again later." },
+      { error: 'Registration failed. Please try again later.' },
       { status: 500 }
     )
   }

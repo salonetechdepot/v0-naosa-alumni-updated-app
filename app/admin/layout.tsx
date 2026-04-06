@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { isAdminLoggedIn, adminLogout } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { LayoutDashboard, Users, CreditCard, LogOut, ArrowLeft } from 'lucide-react'
@@ -24,16 +23,36 @@ export default function AdminLayout({
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   useEffect(() => {
-    const loggedIn = isAdminLoggedIn()
-    setIsAuthenticated(loggedIn)
-    
-    if (!loggedIn && pathname !== '/admin/login') {
-      router.push('/admin/login')
+    async function checkAuth() {
+      // Skip auth check for login page
+      if (pathname === '/admin/login') {
+        setIsAuthenticated(false)
+        return
+      }
+
+      try {
+        const response = await fetch('/api/admin/auth')
+        if (response.ok) {
+          setIsAuthenticated(true)
+        } else {
+          setIsAuthenticated(false)
+          router.push('/admin/login')
+        }
+      } catch {
+        setIsAuthenticated(false)
+        router.push('/admin/login')
+      }
     }
+
+    checkAuth()
   }, [pathname, router])
 
-  const handleLogout = () => {
-    adminLogout()
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/auth', { method: 'DELETE' })
+    } catch {
+      // Ignore errors during logout
+    }
     router.push('/admin/login')
   }
 

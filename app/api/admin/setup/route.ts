@@ -1,60 +1,56 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
+import { NextRequest, NextResponse } from 'next/server'
+import { sql } from '@/lib/db'
+import bcrypt from 'bcryptjs'
 
 // POST - Create initial admin user (only works if no admins exist)
 export async function POST(request: NextRequest) {
   try {
     // Check if any admin exists
-    const existingAdmin = await prisma.adminUser.findFirst()
+    const existingAdmins = await sql`
+      SELECT id FROM "AdminUser" LIMIT 1
+    `
 
-    if (existingAdmin) {
+    if (existingAdmins.length > 0) {
       return NextResponse.json(
-        { error: "Admin user already exists. Use the admin panel to create additional users." },
+        { error: 'Admin user already exists. Use the admin panel to create additional users.' },
         { status: 400 }
       )
     }
 
     const body = await request.json()
-    const { email, password, firstName, lastName } = body
+    const { email, password, name } = body
 
     if (!email || !password) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: 'Email and password are required' },
         { status: 400 }
       )
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12)
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
 
     // Create admin user
-    const admin = await prisma.adminUser.create({
-      data: {
-        email,
-        passwordHash,
-        firstName: firstName || "Admin",
-        lastName: lastName || "User",
-        role: "super_admin",
-        isActive: true,
-      },
-    })
+    await sql`
+      INSERT INTO "AdminUser" (id, email, password, name, "createdAt")
+      VALUES (${id}, ${email}, ${passwordHash}, ${name || 'Admin'}, ${now})
+    `
 
     return NextResponse.json({
       success: true,
-      message: "Admin user created successfully",
+      message: 'Admin user created successfully',
       admin: {
-        id: admin.id,
-        email: admin.email,
-        firstName: admin.firstName,
-        lastName: admin.lastName,
-        role: admin.role,
+        id,
+        email,
+        name: name || 'Admin',
       },
     })
   } catch (error) {
-    console.error("Error creating admin:", error)
+    console.error('Error creating admin:', error)
     return NextResponse.json(
-      { error: "Failed to create admin user" },
+      { error: 'Failed to create admin user' },
       { status: 500 }
     )
   }
@@ -63,15 +59,17 @@ export async function POST(request: NextRequest) {
 // GET - Check if setup is needed
 export async function GET() {
   try {
-    const existingAdmin = await prisma.adminUser.findFirst()
+    const existingAdmins = await sql`
+      SELECT id FROM "AdminUser" LIMIT 1
+    `
 
     return NextResponse.json({
-      setupRequired: !existingAdmin,
+      setupRequired: existingAdmins.length === 0,
     })
   } catch (error) {
-    console.error("Error checking setup status:", error)
+    console.error('Error checking setup status:', error)
     return NextResponse.json(
-      { error: "Failed to check setup status" },
+      { error: 'Failed to check setup status' },
       { status: 500 }
     )
   }

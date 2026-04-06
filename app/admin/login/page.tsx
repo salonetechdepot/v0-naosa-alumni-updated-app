@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { adminLogin } from '@/lib/store'
 import { ArrowLeft, Lock } from 'lucide-react'
 
 export default function AdminLoginPage() {
   const router = useRouter()
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -21,12 +21,28 @@ export default function AdminLoginPage() {
     setIsLoading(true)
     setError('')
 
-    if (adminLogin(password)) {
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Login failed')
+      }
+
+      // Redirect to admin dashboard
       router.push('/admin')
-    } else {
-      setError('Invalid password. Please try again.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid credentials. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   return (
@@ -47,11 +63,22 @@ export default function AdminLoginPage() {
             </div>
             <CardTitle>Admin Portal</CardTitle>
             <CardDescription>
-              Enter your password to access the NAOSA admin dashboard
+              Enter your credentials to access the NAOSA admin dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@naosa.org"
+                  required
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -71,7 +98,7 @@ export default function AdminLoginPage() {
               </Button>
             </form>
             <p className="mt-4 text-center text-xs text-muted-foreground">
-              Demo password: <code className="rounded bg-muted px-1 py-0.5">naosa2024</code>
+              Default: <code className="rounded bg-muted px-1 py-0.5">admin@naosa.org</code> / <code className="rounded bg-muted px-1 py-0.5">admin123</code>
             </p>
           </CardContent>
         </Card>

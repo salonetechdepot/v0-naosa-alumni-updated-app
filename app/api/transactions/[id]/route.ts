@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from 'next/server'
+import { sql } from '@/lib/db'
 
-// GET single transaction by ID
+// GET a single transaction by ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -9,91 +9,32 @@ export async function GET(
   try {
     const { id } = await params
 
-    const transaction = await prisma.transaction.findUnique({
-      where: { id },
-      include: {
-        member: {
-          select: {
-            id: true,
-            memberId: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    })
+    const [transaction] = await sql`
+      SELECT 
+        id, "memberId", "memberName", phone, amount,
+        "transactionReference", "systemReference", "createdAt"
+      FROM "Transaction"
+      WHERE id = ${id}
+    `
 
     if (!transaction) {
       return NextResponse.json(
-        { error: "Transaction not found" },
+        { error: 'Transaction not found' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json(transaction)
+    return NextResponse.json({ transaction })
   } catch (error) {
-    console.error("Error fetching transaction:", error)
+    console.error('Error fetching transaction:', error)
     return NextResponse.json(
-      { error: "Failed to fetch transaction" },
+      { error: 'Failed to fetch transaction' },
       { status: 500 }
     )
   }
 }
 
-// PUT update transaction
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-    const body = await request.json()
-
-    const transaction = await prisma.transaction.update({
-      where: { id },
-      data: {
-        ...body,
-        updatedAt: new Date(),
-      },
-      include: {
-        member: {
-          select: {
-            id: true,
-            memberId: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    })
-
-    // If transaction is completed and it's a membership fee, update member status
-    if (body.status === "completed" && transaction.type === "membership_fee") {
-      await prisma.member.update({
-        where: { id: transaction.memberId },
-        data: {
-          status: "active",
-          membershipStartDate: new Date(),
-          membershipEndDate: new Date(
-            new Date().setFullYear(new Date().getFullYear() + 1)
-          ),
-        },
-      })
-    }
-
-    return NextResponse.json(transaction)
-  } catch (error) {
-    console.error("Error updating transaction:", error)
-    return NextResponse.json(
-      { error: "Failed to update transaction" },
-      { status: 500 }
-    )
-  }
-}
-
-// DELETE transaction
+// DELETE a transaction
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -101,15 +42,26 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    await prisma.transaction.delete({
-      where: { id },
-    })
+    const [existingTransaction] = await sql`
+      SELECT id FROM "Transaction" WHERE id = ${id}
+    `
 
-    return NextResponse.json({ message: "Transaction deleted successfully" })
+    if (!existingTransaction) {
+      return NextResponse.json(
+        { error: 'Transaction not found' },
+        { status: 404 }
+      )
+    }
+
+    await sql`
+      DELETE FROM "Transaction" WHERE id = ${id}
+    `
+
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error deleting transaction:", error)
+    console.error('Error deleting transaction:', error)
     return NextResponse.json(
-      { error: "Failed to delete transaction" },
+      { error: 'Failed to delete transaction' },
       { status: 500 }
     )
   }

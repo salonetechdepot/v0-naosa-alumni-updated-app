@@ -1,36 +1,89 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { getMembers, updateMemberStatus } from '@/lib/store'
-import { sendStatusChangeEmail } from '@/lib/email'
-import { Member, RegistrationStatus } from '@/lib/types'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CheckCircle, XCircle, Eye, Clock, Users } from 'lucide-react'
+
+type RegistrationStatus = 'pending' | 'approved' | 'rejected'
+
+interface Member {
+  id: string
+  firstName: string
+  middleName: string | null
+  surname: string
+  gender: string
+  currentAddress: string
+  admissionNumber: string | null
+  dateOfEntry: string
+  dateOfExit: string
+  email: string | null
+  phone: string
+  registrationAmount: number
+  transactionReference: string
+  systemReference: string
+  status: RegistrationStatus
+  createdAt: string
+}
 
 export default function AdminRegistrationsPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [error, setError] = useState('')
 
-  useEffect(() => {
-    setMembers(getMembers())
+  const fetchMembers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/members')
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to load members')
+      }
+
+      setMembers(result.members)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load members')
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
 
+  useEffect(() => {
+    fetchMembers()
+  }, [fetchMembers])
+
   const handleStatusChange = async (id: string, status: RegistrationStatus) => {
-    const member = members.find(m => m.id === id)
-    updateMemberStatus(id, status)
-    setMembers(getMembers())
-    setDetailsOpen(false)
-    
-    // Send email notification
-    if (member) {
-      const updatedMember = { ...member, status }
-      await sendStatusChangeEmail(updatedMember, status)
+    setIsUpdating(true)
+    try {
+      const response = await fetch(`/api/members/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update status')
+      }
+
+      // Refresh members list
+      await fetchMembers()
+      setDetailsOpen(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update status')
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -109,6 +162,7 @@ export default function AdminRegistrationsPage() {
                           size="icon"
                           className="text-green-600 hover:text-green-700 hover:bg-green-50"
                           onClick={() => handleStatusChange(member.id, 'approved')}
+                          disabled={isUpdating}
                         >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
@@ -117,6 +171,7 @@ export default function AdminRegistrationsPage() {
                           size="icon"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           onClick={() => handleStatusChange(member.id, 'rejected')}
+                          disabled={isUpdating}
                         >
                           <XCircle className="h-4 w-4" />
                         </Button>
@@ -132,6 +187,26 @@ export default function AdminRegistrationsPage() {
     )
   }
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Registrations</h1>
+          <p className="text-muted-foreground">Loading registrations...</p>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -140,6 +215,12 @@ export default function AdminRegistrationsPage() {
           Manage alumni registration requests
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -255,17 +336,19 @@ export default function AdminRegistrationsPage() {
                   <Button
                     className="flex-1 gap-2"
                     onClick={() => handleStatusChange(selectedMember.id, 'approved')}
+                    disabled={isUpdating}
                   >
                     <CheckCircle className="h-4 w-4" />
-                    Approve
+                    {isUpdating ? 'Updating...' : 'Approve'}
                   </Button>
                   <Button
                     variant="destructive"
                     className="flex-1 gap-2"
                     onClick={() => handleStatusChange(selectedMember.id, 'rejected')}
+                    disabled={isUpdating}
                   >
                     <XCircle className="h-4 w-4" />
-                    Reject
+                    {isUpdating ? 'Updating...' : 'Reject'}
                   </Button>
                 </div>
               )}

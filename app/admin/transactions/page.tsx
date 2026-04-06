@@ -4,16 +4,45 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
-import { getTransactions } from '@/lib/store'
-import { Transaction } from '@/lib/types'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CreditCard, Search } from 'lucide-react'
+
+interface Transaction {
+  id: string
+  memberId: string
+  memberName: string
+  phone: string
+  amount: number
+  transactionReference: string
+  systemReference: string
+  createdAt: string
+}
 
 export default function AdminTransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    setTransactions(getTransactions())
+    async function fetchTransactions() {
+      try {
+        const response = await fetch('/api/transactions')
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to load transactions')
+        }
+
+        setTransactions(result.transactions)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load transactions')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchTransactions()
   }, [])
 
   const filteredTransactions = transactions.filter((t) => {
@@ -28,6 +57,29 @@ export default function AdminTransactionsPage() {
 
   const totalAmount = filteredTransactions.reduce((sum, t) => sum + t.amount, 0)
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Transactions</h1>
+          <p className="text-muted-foreground">Loading transactions...</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-24" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -36,6 +88,12 @@ export default function AdminTransactionsPage() {
           Track all payment transactions from alumni registrations
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

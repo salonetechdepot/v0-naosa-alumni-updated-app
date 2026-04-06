@@ -1,119 +1,118 @@
-import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { NextRequest, NextResponse } from 'next/server'
+import { sql, generateSystemReference } from '@/lib/db'
 
-// GET all members or filter by query params
+// GET all members
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get("status")
-    const membershipType = searchParams.get("membershipType")
-    const search = searchParams.get("search")
+    const status = searchParams.get('status')
 
-    const where: any = {}
-
-    if (status) {
-      where.status = status
+    let members
+    
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      members = await sql`
+        SELECT 
+          id, "firstName", "middleName", surname, gender, 
+          "currentAddress", "admissionNumber", "dateOfEntry", "dateOfExit",
+          email, phone, "registrationAmount", "transactionReference", 
+          "systemReference", status, "createdAt", "updatedAt"
+        FROM "Member"
+        WHERE status = ${status}
+        ORDER BY "createdAt" DESC
+      `
+    } else {
+      members = await sql`
+        SELECT 
+          id, "firstName", "middleName", surname, gender, 
+          "currentAddress", "admissionNumber", "dateOfEntry", "dateOfExit",
+          email, phone, "registrationAmount", "transactionReference", 
+          "systemReference", status, "createdAt", "updatedAt"
+        FROM "Member"
+        ORDER BY "createdAt" DESC
+      `
     }
 
-    if (membershipType) {
-      where.membershipType = membershipType
-    }
-
-    if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: "insensitive" } },
-        { lastName: { contains: search, mode: "insensitive" } },
-        { email: { contains: search, mode: "insensitive" } },
-        { memberId: { contains: search, mode: "insensitive" } },
-      ]
-    }
-
-    const members = await prisma.member.findMany({
-      where,
-      include: {
-        transactions: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    })
-
-    return NextResponse.json(members)
+    return NextResponse.json({ members })
   } catch (error) {
-    console.error("Error fetching members:", error)
+    console.error('Error fetching members:', error)
     return NextResponse.json(
-      { error: "Failed to fetch members" },
+      { error: 'Failed to fetch members' },
       { status: 500 }
     )
   }
 }
 
-// POST create new member
+// POST create a new member
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
     const {
       firstName,
-      lastName,
+      middleName,
+      surname,
+      gender,
+      currentAddress,
+      admissionNumber,
+      dateOfEntry,
+      dateOfExit,
       email,
       phone,
-      address,
-      city,
-      state,
-      zipCode,
-      country,
-      membershipType,
-      occupation,
-      employer,
-      emergencyContactName,
-      emergencyContactPhone,
-      notes,
+      registrationAmount,
+      transactionReference,
     } = body
 
-    // Check if email already exists
-    const existingMember = await prisma.member.findUnique({
-      where: { email },
-    })
-
-    if (existingMember) {
+    // Validate required fields
+    if (!firstName || !surname || !gender || !currentAddress || !dateOfEntry || !dateOfExit || !phone || !transactionReference) {
       return NextResponse.json(
-        { error: "A member with this email already exists" },
+        { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    // Generate member ID
-    const memberCount = await prisma.member.count()
-    const memberId = `NAOSA-${String(memberCount + 1).padStart(5, "0")}`
+    const systemReference = generateSystemReference()
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
 
-    const member = await prisma.member.create({
-      data: {
-        memberId,
-        firstName,
-        lastName,
-        email,
-        phone,
-        address,
-        city,
-        state,
-        zipCode,
-        country,
-        membershipType,
-        occupation,
-        employer,
-        emergencyContactName,
-        emergencyContactPhone,
-        notes,
-        status: "pending",
-      },
-    })
+    // Insert member
+    await sql`
+      INSERT INTO "Member" (
+        id, "firstName", "middleName", surname, gender, "currentAddress",
+        "admissionNumber", "dateOfEntry", "dateOfExit", email, phone,
+        "registrationAmount", "transactionReference", "systemReference",
+        status, "createdAt", "updatedAt"
+      ) VALUES (
+        ${id}, ${firstName}, ${middleName || null}, ${surname}, ${gender},
+        ${currentAddress}, ${admissionNumber || null}, ${dateOfEntry}, ${dateOfExit},
+        ${email || null}, ${phone}, ${registrationAmount || 0}, ${transactionReference},
+        ${systemReference}, 'pending', ${now}, ${now}
+      )
+    `
 
-    return NextResponse.json(member, { status: 201 })
+    // Also create a transaction record
+    const transactionId = crypto.randomUUID()
+    const memberName = `${firstName} ${middleName || ''} ${surname}`.trim().replace(/\s+/g, ' ')
+
+    await sql`
+      INSERT INTO "Transaction" (
+        id, "memberId", "memberName", phone, amount,
+        "transactionReference", "systemReference", "createdAt"
+      ) VALUES (
+        ${transactionId}, ${id}, ${memberName}, ${phone},
+        ${registrationAmount || 0}, ${transactionReference}, ${systemReference}, ${now}
+      )
+    `
+
+    // Return the created member
+    const [member] = await sql`
+      SELECT * FROM "Member" WHERE id = ${id}
+    `
+
+    return NextResponse.json({ member }, { status: 201 })
   } catch (error) {
-    console.error("Error creating member:", error)
+    console.error('Error creating member:', error)
     return NextResponse.json(
-      { error: "Failed to create member" },
+      { error: 'Failed to create member' },
       { status: 500 }
     )
   }

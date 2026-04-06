@@ -5,8 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { addMember } from '@/lib/store'
-import { sendStatusChangeEmail } from '@/lib/email'
 import { CheckCircle } from 'lucide-react'
 
 interface RegistrationFormProps {
@@ -18,14 +16,16 @@ export function RegistrationForm({ onSuccess, isModal = false }: RegistrationFor
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [systemRef, setSystemRef] = useState('')
+  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setError('')
 
     const formData = new FormData(e.currentTarget)
     
-    const member = addMember({
+    const memberData = {
       firstName: formData.get('firstName') as string,
       middleName: formData.get('middleName') as string,
       surname: formData.get('surname') as string,
@@ -38,15 +38,31 @@ export function RegistrationForm({ onSuccess, isModal = false }: RegistrationFor
       phone: formData.get('phone') as string,
       registrationAmount: parseFloat(formData.get('registrationAmount') as string) || 0,
       transactionReference: formData.get('transactionReference') as string,
-    })
+    }
 
-    // Send confirmation email to applicant
-    await sendStatusChangeEmail(member, 'pending')
+    try {
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(memberData),
+      })
 
-    setSystemRef(member.systemReference)
-    setIsSuccess(true)
-    setIsSubmitting(false)
-    onSuccess?.()
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Registration failed')
+      }
+
+      setSystemRef(result.member.systemReference)
+      setIsSuccess(true)
+      onSuccess?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (isSuccess) {
@@ -75,6 +91,12 @@ export function RegistrationForm({ onSuccess, isModal = false }: RegistrationFor
 
   const formContent = (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+      
       {/* Name Fields */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
