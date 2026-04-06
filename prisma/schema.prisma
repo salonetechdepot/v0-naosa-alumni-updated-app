@@ -1,0 +1,73 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+enum RegistrationStatus {
+  pending
+  approved
+  rejected
+}
+
+enum Gender {
+  male
+  female
+}
+
+model Member {
+  id                   String             @id @default(cuid())
+  firstName            String
+  middleName           String?
+  surname              String
+  gender               Gender
+  currentAddress       String
+  admissionNumber      String?
+  dateOfEntry          DateTime
+  dateOfExit           DateTime
+  email                String?
+  phone                String
+  registrationAmount   Float
+  transactionReference String
+  systemReference      String             @unique
+  status               RegistrationStatus @default(pending)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  transactions Transaction[]
+
+  @@index([status])
+  @@index([email])
+  @@index([phone])
+  @@index([systemReference])
+}
+
+model Transaction {
+  id                   String   @id @default(cuid())
+  memberId             String
+  memberName           String
+  phone                String
+  amount               Float
+  transactionReference String
+  systemReference      String
+  createdAt            DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([transactionReference])
+  @@index([systemReference])
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
