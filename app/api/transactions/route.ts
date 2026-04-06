@@ -1,16 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 
-// GET all transactions
-export async function GET() {
+// GET all transactions with optional type filter
+export async function GET(request: NextRequest) {
   try {
-    const transactions = await sql`
-      SELECT 
-        id, "memberId", "memberName", phone, amount,
-        "transactionReference", "systemReference", "createdAt"
-      FROM "Transaction"
-      ORDER BY "createdAt" DESC
-    `
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type')
+
+    let transactions
+    if (type && ['registration', 'donation', 'contribution'].includes(type)) {
+      transactions = await sql`
+        SELECT 
+          id, "memberId", "memberName", phone, amount,
+          "transactionReference", "systemReference", type, description, "createdAt"
+        FROM "Transaction"
+        WHERE type = ${type}
+        ORDER BY "createdAt" DESC
+      `
+    } else {
+      transactions = await sql`
+        SELECT 
+          id, "memberId", "memberName", phone, amount,
+          "transactionReference", "systemReference", type, description, "createdAt"
+        FROM "Transaction"
+        ORDER BY "createdAt" DESC
+      `
+    }
 
     return NextResponse.json({ transactions })
   } catch (error) {
@@ -22,7 +37,7 @@ export async function GET() {
   }
 }
 
-// POST create a new transaction (usually done automatically with member registration)
+// POST create a new transaction
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -34,12 +49,22 @@ export async function POST(request: NextRequest) {
       amount,
       transactionReference,
       systemReference,
+      type = 'registration',
+      description,
     } = body
 
     // Validate required fields
-    if (!memberId || !memberName || !phone || !transactionReference || !systemReference) {
+    if (!memberName || !phone || !transactionReference || !systemReference) {
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      )
+    }
+
+    // Validate transaction type
+    if (!['registration', 'donation', 'contribution'].includes(type)) {
+      return NextResponse.json(
+        { error: 'Invalid transaction type. Must be registration, donation, or contribution' },
         { status: 400 }
       )
     }
@@ -50,10 +75,11 @@ export async function POST(request: NextRequest) {
     await sql`
       INSERT INTO "Transaction" (
         id, "memberId", "memberName", phone, amount,
-        "transactionReference", "systemReference", "createdAt"
+        "transactionReference", "systemReference", type, description, "createdAt"
       ) VALUES (
-        ${id}, ${memberId}, ${memberName}, ${phone},
-        ${amount || 0}, ${transactionReference}, ${systemReference}, ${now}
+        ${id}, ${memberId || null}, ${memberName}, ${phone},
+        ${amount || 0}, ${transactionReference}, ${systemReference}, 
+        ${type}, ${description || null}, ${now}
       )
     `
 
