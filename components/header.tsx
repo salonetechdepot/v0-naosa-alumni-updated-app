@@ -1,25 +1,25 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Menu, X } from "lucide-react";
+import { useState } from "react";
 
 const navLinks = [
-  { href: '/', label: 'Home' },
-  { href: '/register', label: 'Register' },
-  { href: '/contact', label: 'Contact' },
-]
+  { href: "/", label: "Home" },
+  { href: "/members", label: "Members" },
+  { href: "/contact", label: "Contact" },
+];
 
 export function Header() {
-  const pathname = usePathname()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Don't show header on admin pages
-  if (pathname.startsWith('/admin')) {
-    return null
+  if (pathname.startsWith("/admin")) {
+    return null;
   }
 
   return (
@@ -31,7 +31,9 @@ export function Header() {
           </div>
           <div className="hidden sm:block">
             <p className="font-semibold text-foreground leading-tight">NAOSA</p>
-            <p className="text-xs text-muted-foreground">Kenema, Sierra Leone</p>
+            <p className="text-xs text-muted-foreground">
+              Kenema, Sierra Leone
+            </p>
           </div>
         </Link>
 
@@ -42,10 +44,10 @@ export function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                'px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                "px-4 py-2 rounded-md text-sm font-medium transition-colors",
                 pathname === link.href
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-foreground hover:bg-secondary'
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground hover:bg-secondary",
               )}
             >
               {link.label}
@@ -65,7 +67,11 @@ export function Header() {
           className="md:hidden"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          {mobileMenuOpen ? (
+            <X className="h-5 w-5" />
+          ) : (
+            <Menu className="h-5 w-5" />
+          )}
         </Button>
       </div>
 
@@ -79,10 +85,10 @@ export function Header() {
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
                 className={cn(
-                  'px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                  "px-4 py-2 rounded-md text-sm font-medium transition-colors",
                   pathname === link.href
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-foreground hover:bg-secondary'
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground hover:bg-secondary",
                 )}
               >
                 {link.label}
@@ -97,5 +103,5 @@ export function Header() {
         </nav>
       )}
     </header>
-  )
+  );
 }

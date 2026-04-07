@@ -6,7 +6,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL_UNPOOLED")
+  // directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 enum RegistrationStatus {
@@ -20,6 +20,15 @@ enum Gender {
   female
 }
 
+enum UserRole {
+  admin
+  member
+  user
+  volunteer
+  support
+  donor
+}
+
 model Member {
   id                   String             @id @default(cuid())
   firstName            String
@@ -27,11 +36,13 @@ model Member {
   surname              String
   gender               Gender
   currentAddress       String
+  city                 String?
+  country              String?            @default("Sierra Leone")
   admissionNumber      String?
   dateOfEntry          DateTime
-  dateOfExit           DateTime
-  email                String?
-  phone                String
+  dateOfExit           DateTime?
+  email                String?            @unique
+  phone                String             @unique
   registrationAmount   Float
   transactionReference String
   systemReference      String             @unique
@@ -39,12 +50,19 @@ model Member {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
+  // Link to User account - relation defined here
+  userId               String?            @unique
+  user                 User?              @relation(fields: [userId], references: [id])
+
   transactions Transaction[]
 
   @@index([status])
   @@index([email])
   @@index([phone])
   @@index([systemReference])
+  @@index([city])
+  @@index([country])
+  @@index([userId])
 }
 
 model Transaction {
@@ -55,6 +73,8 @@ model Transaction {
   amount               Float
   transactionReference String
   systemReference      String
+  type                 String   @default("registration")
+  description          String?
   createdAt            DateTime @default(now())
 
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -62,12 +82,24 @@ model Transaction {
   @@index([memberId])
   @@index([transactionReference])
   @@index([systemReference])
+  @@index([type])
 }
 
-model AdminUser {
+model User {
   id           String   @id @default(cuid())
-  username     String   @unique
-  passwordHash String
+  email        String   @unique
+  password     String
+  name         String
+  role         UserRole @default(user)
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // Link to Member profile - NO @relation attributes here, just the field
+  memberId     String?  @unique
+  member       Member?  // This creates the relation without extra attributes
+
+  @@index([email])
+  @@index([role])
+  @@index([memberId])
 }

@@ -1,109 +1,363 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { sql, generateSystemReference } from '@/lib/db'
+// app/api/register/route.ts
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { PrismaClient } from "@prisma/client";
+import { nanoid } from "nanoid";
+import { standardizeAmount } from "@/lib/currency";
 
-// Public registration endpoint
-export async function POST(request: NextRequest) {
+const prisma = new PrismaClient();
+
+// Helper to generate system reference
+function generateSystemReference(): string {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = nanoid(6).toUpperCase();
+  return `NAOSA-${timestamp}-${random}`;
+}
+
+// Validation schema for registration
+const registrationSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  middleName: z.string().optional().nullable(),
+  surname: z.string().min(1, "Surname is required"),
+  gender: z.enum(["male", "female"]),
+  currentAddress: z.string().min(5, "Address is required"),
+  city: z.string().min(2, "City is required"),
+  country: z.string().min(2, "Country is required").default("Sierra Leone"),
+  admissionNumber: z.string().optional().nullable(),
+  dateOfEntry: z.string().min(1, "Date of entry is required"),
+  dateOfExit: z.string().min(1, "Date of exit is required"),
+  email: z.string().email("Invalid email").optional().nullable(),
+  phone: z.string().min(6, "Phone number is required"),
+  registrationAmount: z.number().min(0, "Amount must be positive"),
+  transactionReference: z.string().min(1, "Transaction reference is required"),
+});
+
+export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await request.json();
 
-    const {
-      firstName,
-      middleName,
-      surname,
-      gender,
-      currentAddress,
-      admissionNumber,
-      dateOfEntry,
-      dateOfExit,
-      email,
-      phone,
-      registrationAmount,
-      transactionReference,
-    } = body
+    // Validate request body
+    const validationResult = registrationSchema.safeParse(body);
 
-    // Validate required fields
-    if (!firstName || !surname || !gender || !currentAddress || !dateOfEntry || !dateOfExit || !phone || !transactionReference) {
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'Missing required fields. Please fill in all required fields.' },
-        { status: 400 }
-      )
+        {
+          error: "Validation failed",
+          details: validationResult.error.issues,
+        },
+        { status: 400 },
+      );
     }
 
-    // Validate gender
-    if (!['male', 'female'].includes(gender)) {
+    const data = validationResult.data;
+
+    // Standardize the amount (convert Old Leone to New Leone if needed)
+    const standardizedAmount = standardizeAmount(data.registrationAmount);
+
+    const systemReference = generateSystemReference();
+    const memberName =
+      `${data.firstName} ${data.middleName || ""} ${data.surname}`
+        .trim()
+        .replace(/\s+/g, " ");
+
+    // Check if member already exists
+    const existingMember = await prisma.member.findFirst({
+      where: {
+        OR: [
+          { email: data.email || undefined },
+          { phone: data.phone },
+          { transactionReference: data.transactionReference },
+        ],
+      },
+    });
+
+    if (existingMember) {
       return NextResponse.json(
-        { error: 'Invalid gender value' },
-        { status: 400 }
-      )
+        {
+          error:
+            "Member with this email, phone, or transaction reference already exists",
+        },
+        { status: 409 },
+      );
     }
 
-    // Check for duplicate transaction reference
-    const existingTransaction = await sql`
-      SELECT id FROM "Transaction" WHERE "transactionReference" = ${transactionReference}
-    `
+    // Create member and transaction in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create member with standardized amount
+      const member = await tx.member.create({
+        data: {
+          firstName: data.firstName,
+          middleName: data.middleName || null,
+          surname: data.surname,
+          gender: data.gender,
+          currentAddress: data.currentAddress,
+          city: data.city,
+          country: data.country,
+          admissionNumber: data.admissionNumber || null,
+          dateOfEntry: new Date(data.dateOfEntry),
+          dateOfExit: new Date(data.dateOfExit),
+          email: data.email || null,
+          phone: data.phone,
+          registrationAmount: standardizedAmount, // Use standardized amount
+          transactionReference: data.transactionReference,
+          systemReference: systemReference,
+          status: "pending",
+        },
+      });
 
-    if (existingTransaction.length > 0) {
-      return NextResponse.json(
-        { error: 'This transaction reference has already been used. Please provide a unique transaction reference.' },
-        { status: 400 }
-      )
-    }
+      // Create transaction record with standardized amount
+      const transaction = await tx.transaction.create({
+        data: {
+          memberId: member.id,
+          memberName: memberName,
+          phone: data.phone,
+          amount: standardizedAmount, // Use standardized amount
+          transactionReference: data.transactionReference,
+          systemReference: systemReference,
+          type: "registration",
+        },
+      });
 
-    const systemReference = generateSystemReference()
-    const id = crypto.randomUUID()
-    const now = new Date().toISOString()
+      return { member, transaction };
+    });
 
-    // Insert member
-    await sql`
-      INSERT INTO "Member" (
-        id, "firstName", "middleName", surname, gender, "currentAddress",
-        "admissionNumber", "dateOfEntry", "dateOfExit", email, phone,
-        "registrationAmount", "transactionReference", "systemReference",
-        status, "createdAt", "updatedAt"
-      ) VALUES (
-        ${id}, ${firstName}, ${middleName || null}, ${surname}, ${gender},
-        ${currentAddress}, ${admissionNumber || null}, ${dateOfEntry}, ${dateOfExit},
-        ${email || null}, ${phone}, ${registrationAmount || 0}, ${transactionReference},
-        ${systemReference}, 'pending', ${now}, ${now}
-      )
-    `
-
-    // Create transaction record
-    const transactionId = crypto.randomUUID()
-    const memberName = `${firstName} ${middleName || ''} ${surname}`.trim().replace(/\s+/g, ' ')
-
-    await sql`
-      INSERT INTO "Transaction" (
-        id, "memberId", "memberName", phone, amount,
-        "transactionReference", "systemReference", type, description, "createdAt"
-      ) VALUES (
-        ${transactionId}, ${id}, ${memberName}, ${phone},
-        ${registrationAmount || 0}, ${transactionReference}, ${systemReference},
-        'registration', 'Member registration fee', ${now}
-      )
-    `
-
-    // Get the created member
-    const [member] = await sql`
-      SELECT 
-        id, "firstName", "middleName", surname, gender, 
-        "currentAddress", "admissionNumber", "dateOfEntry", "dateOfExit",
-        email, phone, "registrationAmount", "transactionReference", 
-        "systemReference", status, "createdAt", "updatedAt"
-      FROM "Member"
-      WHERE id = ${id}
-    `
-
-    return NextResponse.json({
-      success: true,
-      message: 'Registration submitted successfully',
-      member,
-    }, { status: 201 })
-  } catch (error) {
-    console.error('Registration error:', error)
     return NextResponse.json(
-      { error: 'Registration failed. Please try again later.' },
-      { status: 500 }
-    )
+      {
+        success: true,
+        member: result.member,
+        message: "Registration submitted successfully",
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("Registration error:", error);
+    return NextResponse.json(
+      { error: "Failed to process registration" },
+      { status: 500 },
+    );
   }
 }
+
+// GET endpoint to check registration status
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const reference = searchParams.get("reference");
+
+    if (!reference) {
+      return NextResponse.json(
+        { error: "Reference number required" },
+        { status: 400 },
+      );
+    }
+
+    const member = await prisma.member.findUnique({
+      where: { systemReference: reference },
+      select: {
+        firstName: true,
+        surname: true,
+        status: true,
+        createdAt: true,
+        systemReference: true,
+      },
+    });
+
+    if (!member) {
+      return NextResponse.json(
+        { error: "Registration not found" },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ member });
+  } catch (error) {
+    console.error("Status check error:", error);
+    return NextResponse.json(
+      { error: "Failed to check status" },
+      { status: 500 },
+    );
+  }
+}
+
+// // app/api/register/route.ts
+// import { NextResponse } from "next/server";
+// import { z } from "zod";
+// import { PrismaClient } from "@prisma/client";
+// import { nanoid } from "nanoid";
+
+// // Add this import at the top
+// import { standardizeAmount } from "@/lib/currency";
+
+// const prisma = new PrismaClient();
+
+// // Helper to generate system reference
+// function generateSystemReference(): string {
+//   const timestamp = Date.now().toString(36).toUpperCase();
+//   const random = nanoid(6).toUpperCase();
+//   return `NAOSA-${timestamp}-${random}`;
+// }
+
+// // Validation schema for registration
+// const registrationSchema = z.object({
+//   firstName: z.string().min(1, "First name is required"),
+//   middleName: z.string().optional().nullable(),
+//   surname: z.string().min(1, "Surname is required"),
+//   gender: z.enum(["male", "female"]),
+//   currentAddress: z.string().min(5, "Address is required"),
+//   city: z.string().min(2, "City is required"),
+//   country: z.string().min(2, "Country is required").default("Sierra Leone"),
+//   admissionNumber: z.string().optional().nullable(),
+//   dateOfEntry: z.string().min(1, "Date of entry is required"),
+//   dateOfExit: z.string().min(1, "Date of exit is required"),
+//   email: z.string().email("Invalid email").optional().nullable(),
+//   phone: z.string().min(6, "Phone number is required"),
+//   registrationAmount: z.number().min(0, "Amount must be positive"),
+//   transactionReference: z.string().min(1, "Transaction reference is required"),
+// });
+
+// export async function POST(request: Request) {
+//   try {
+//     const body = await request.json();
+
+//     // Validate request body
+//     const validationResult = registrationSchema.safeParse(body);
+
+//     if (!validationResult.success) {
+//       return NextResponse.json(
+//         {
+//           error: "Validation failed",
+//           details: validationResult.error.issues,
+//         },
+//         { status: 400 },
+//       );
+//     }
+
+//     const data = validationResult.data;
+//     const systemReference = generateSystemReference();
+//     const memberName =
+//       `${data.firstName} ${data.middleName || ""} ${data.surname}`
+//         .trim()
+//         .replace(/\s+/g, " ");
+
+//     // Check if member already exists (optional)
+//     const existingMember = await prisma.member.findFirst({
+//       where: {
+//         OR: [
+//           { email: data.email || undefined },
+//           { phone: data.phone },
+//           { transactionReference: data.transactionReference },
+//         ],
+//       },
+//     });
+
+//     if (existingMember) {
+//       return NextResponse.json(
+//         {
+//           error:
+//             "Member with this email, phone, or transaction reference already exists",
+//         },
+//         { status: 409 },
+//       );
+//     }
+
+//     // Create member and transaction in a transaction
+//     const result = await prisma.$transaction(async (tx) => {
+//       // Create member
+
+//       // In the POST function, after parsing the body:
+//       const registrationAmount = standardizeAmount(body.registrationAmount);
+
+//       const member = await tx.member.create({
+//         data: {
+//           firstName: data.firstName,
+//           middleName: data.middleName || null,
+//           surname: data.surname,
+//           gender: data.gender,
+//           currentAddress: data.currentAddress,
+//           city: data.city,
+//           country: data.country,
+//           admissionNumber: data.admissionNumber || null,
+//           dateOfEntry: new Date(data.dateOfEntry),
+//           dateOfExit: new Date(data.dateOfExit),
+//           email: data.email || null,
+//           phone: data.phone,
+//           registrationAmount: data.registrationAmount,
+//           transactionReference: data.transactionReference,
+//           systemReference: systemReference,
+//           status: "pending",
+//         },
+//       });
+
+//       // Create transaction record
+//       const transaction = await tx.transaction.create({
+//         data: {
+//           memberId: member.id,
+//           memberName: memberName,
+//           phone: data.phone,
+//           amount: data.registrationAmount,
+//           transactionReference: data.transactionReference,
+//           systemReference: systemReference,
+//           type: "registration",
+//         },
+//       });
+
+//       return { member, transaction };
+//     });
+
+//     return NextResponse.json(
+//       {
+//         success: true,
+//         member: result.member,
+//         message: "Registration submitted successfully",
+//       },
+//       { status: 201 },
+//     );
+//   } catch (error) {
+//     console.error("Registration error:", error);
+//     return NextResponse.json(
+//       { error: "Failed to process registration" },
+//       { status: 500 },
+//     );
+//   }
+// }
+
+// // Optional: GET endpoint to check registration status
+// export async function GET(request: Request) {
+//   try {
+//     const { searchParams } = new URL(request.url);
+//     const reference = searchParams.get("reference");
+
+//     if (!reference) {
+//       return NextResponse.json(
+//         { error: "Reference number required" },
+//         { status: 400 },
+//       );
+//     }
+
+//     const member = await prisma.member.findUnique({
+//       where: { systemReference: reference },
+//       select: {
+//         firstName: true,
+//         surname: true,
+//         status: true,
+//         createdAt: true,
+//         systemReference: true,
+//       },
+//     });
+
+//     if (!member) {
+//       return NextResponse.json(
+//         { error: "Registration not found" },
+//         { status: 404 },
+//       );
+//     }
+
+//     return NextResponse.json({ member });
+//   } catch (error) {
+//     console.error("Status check error:", error);
+//     return NextResponse.json(
+//       { error: "Failed to check status" },
+//       { status: 500 },
+//     );
+//   }
+// }
