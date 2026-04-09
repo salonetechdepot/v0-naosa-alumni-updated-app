@@ -1,5 +1,11 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Phone, Mail, CreditCard, MapPin, Users } from 'lucide-react'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Phone, Mail, CreditCard, MapPin, Users } from "lucide-react";
 
 export default function ContactPage() {
   return (
@@ -23,23 +29,33 @@ export default function ContactPage() {
                 <Users className="h-5 w-5" />
               </div>
               <CardTitle>Contact Persons</CardTitle>
-              <CardDescription>Reach out to our association coordinators</CardDescription>
+              <CardDescription>
+                Reach out to our association coordinators
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <p className="font-medium text-foreground">Augustine Ngegba</p>
                 <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="h-4 w-4" />
-                  <a href="tel:+23276232900" className="hover:text-primary transition-colors">
+                  <a
+                    href="tel:+23276232900"
+                    className="hover:text-primary transition-colors"
+                  >
                     +232-76-232900
                   </a>
                 </div>
               </div>
               <div>
-                <p className="font-medium text-foreground">Augustine Baimba Bockarie</p>
+                <p className="font-medium text-foreground">
+                  Baimba Augustine Bockarie
+                </p>
                 <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                   <Phone className="h-4 w-4" />
-                  <a href="tel:+23276792218" className="hover:text-primary transition-colors">
+                  <a
+                    href="tel:+23276792218"
+                    className="hover:text-primary transition-colors"
+                  >
                     +232-76-792218
                   </a>
                 </div>
@@ -57,11 +73,11 @@ export default function ContactPage() {
               <CardDescription>Send us an email anytime</CardDescription>
             </CardHeader>
             <CardContent>
-              <a 
-                href="mailto:NAOSAkenema@gmail.com" 
+              <a
+                href="mailto:NAOSAkenema@gmail.com"
                 className="text-lg font-medium text-primary hover:underline"
               >
-                NAOSAkenema@gmail.com
+                naosakenema@gmail.com
               </a>
               <p className="mt-2 text-sm text-muted-foreground">
                 We typically respond within 24-48 hours
@@ -76,13 +92,20 @@ export default function ContactPage() {
                 <CreditCard className="h-5 w-5" />
               </div>
               <CardTitle>Payment Information</CardTitle>
-              <CardDescription>For registration fees and donations</CardDescription>
+              <CardDescription>
+                For registration fees and donations
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-2">Send payments to:</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                Send payments to:
+              </p>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-primary" />
-                <a href="tel:+23276792218" className="text-lg font-medium text-foreground hover:text-primary transition-colors">
+                <a
+                  href="tel:+23276792218"
+                  className="text-lg font-medium text-foreground hover:text-primary transition-colors"
+                >
                   +232-76-792218
                 </a>
               </div>
@@ -106,7 +129,8 @@ export default function ContactPage() {
                 Nasir Ahmadiyya Muslim Secondary School
               </p>
               <p className="text-muted-foreground">
-                Kenema, Eastern Province<br />
+                Kenema, Eastern Province
+                <br />
                 Sierra Leone
               </p>
             </CardContent>
@@ -120,13 +144,14 @@ export default function ContactPage() {
               Want to Get Involved?
             </h3>
             <p className="text-muted-foreground">
-              Whether you want to volunteer, donate, or simply reconnect with fellow alumni, 
-              we welcome your participation. Reach out to us through any of the channels above 
-              and let&apos;s work together to support our alma mater.
+              Whether you want to volunteer, donate, or simply reconnect with
+              fellow alumni, we welcome your participation. Reach out to us
+              through any of the channels above and let&apos;s work together to
+              support our alma mater.
             </p>
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }

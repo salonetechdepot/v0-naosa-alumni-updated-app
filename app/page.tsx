@@ -1,7 +1,13 @@
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, BookOpen, Heart, ArrowRight } from 'lucide-react'
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Users, BookOpen, Heart, ArrowRight } from "lucide-react";
 
 export default function HomePage() {
   return (
@@ -22,14 +28,18 @@ export default function HomePage() {
             Kenema, Sierra Leone
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link href="/register">
+            <Link href="/members">
               <Button size="lg" variant="secondary" className="gap-2">
                 Join Our Community
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
             <Link href="/contact">
-              <Button size="lg" variant="outline" className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-primary-foreground/30  bg-primary-foreground/10 text-white hover:bg-secondary-foreground/10"
+              >
                 Contact Us
               </Button>
             </Link>
@@ -45,10 +55,10 @@ export default function HomePage() {
               Welcome to NAOSA
             </h2>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              We are a community of proud alumni from Nasir Ahmadiyya Muslim Secondary School, 
-              united by our shared experiences and commitment to supporting our alma mater. 
-              Join us in fostering connections, supporting current students, and celebrating 
-              our rich heritage.
+              We are a community of proud alumni from Nasir Ahmadiyya Muslim
+              Secondary School, united by our shared experiences and commitment
+              to supporting our alma mater. Join us in fostering connections,
+              supporting current students, and celebrating our rich heritage.
             </p>
           </div>
         </div>
@@ -68,13 +78,15 @@ export default function HomePage() {
                 </div>
                 <CardTitle>Connect with Alumni</CardTitle>
                 <CardDescription>
-                  Reconnect with old classmates and build lasting professional networks
+                  Reconnect with old classmates and build lasting professional
+                  networks
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Our alumni network spans across Sierra Leone and beyond. Stay connected 
-                  with fellow graduates and expand your professional circle.
+                  Our alumni network spans across Sierra Leone and beyond. Stay
+                  connected with fellow graduates and expand your professional
+                  circle.
                 </p>
               </CardContent>
             </Card>
@@ -91,8 +103,9 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Help provide scholarships, improve facilities, and mentor current 
-                  students to ensure the legacy of our school continues to thrive.
+                  Help provide scholarships, improve facilities, and mentor
+                  current students to ensure the legacy of our school continues
+                  to thrive.
                 </p>
               </CardContent>
             </Card>
@@ -109,7 +122,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  Through various initiatives and programs, contribute to the 
+                  Through various initiatives and programs, contribute to the
                   betterment of Kenema and the broader Sierra Leonean community.
                 </p>
               </CardContent>
@@ -127,10 +140,11 @@ export default function HomePage() {
                 Ready to Join Our Alumni Community?
               </h2>
               <p className="max-w-2xl text-primary-foreground/90">
-                Register today and become part of a growing network of NAOSA members 
-                dedicated to excellence, service, and community building.
+                Register today and become part of a growing network of NAOSA
+                members dedicated to excellence, service, and community
+                building.
               </p>
-              <Link href="/register">
+              <Link href="/members">
                 <Button size="lg" variant="secondary" className="gap-2">
                   Register Now
                   <ArrowRight className="h-4 w-4" />
@@ -141,5 +155,5 @@ export default function HomePage() {
         </div>
       </section>
     </div>
-  )
+  );
 }
