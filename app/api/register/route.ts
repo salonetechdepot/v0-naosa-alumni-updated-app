@@ -5,6 +5,8 @@ import { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { standardizeAmount } from "@/lib/currency";
 
+import { sendRegistrationConfirmation } from "@/lib/email-service";
+
 const prisma = new PrismaClient();
 
 // Helper to generate system reference
@@ -117,6 +119,21 @@ export async function POST(request: Request) {
           type: "registration",
         },
       });
+
+      // After creating the member, send confirmation email
+      if (member.email) {
+        // Send email asynchronously without awaiting
+        sendRegistrationConfirmation(
+          member.email,
+          `${member.firstName} ${member.surname}`,
+          member.systemReference,
+          member.registrationAmount,
+          member.transactionReference,
+        ).catch((error) => {
+          console.error("Failed to send confirmation email:", error);
+          // Don't throw error - registration is still successful
+        });
+      }
 
       return { member, transaction };
     });
