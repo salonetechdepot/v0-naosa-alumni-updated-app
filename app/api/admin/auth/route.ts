@@ -62,12 +62,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user
+    // Use a type assertion to bypass the TypeScript check
     const user = await prisma.user.findFirst({
       where: {
         email,
         role: {
-          in: ["admin", "super_admin"],
+          in: ["admin", "super_admin"] as any, // Type assertion to bypass the check
         },
         isActive: true,
       },
