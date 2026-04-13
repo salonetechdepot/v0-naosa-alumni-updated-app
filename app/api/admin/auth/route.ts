@@ -2,14 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { sessions } from "@/lib/session-store";
 
 const SESSION_COOKIE_NAME = "admin_session";
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
-const sessions = new Map<
-  string,
-  { userId: string; email: string; role: string; expiresAt: Date }
->();
 
 function generateSessionToken(): string {
   return crypto.randomUUID() + "-" + Date.now().toString(36);
@@ -43,6 +39,7 @@ export async function GET() {
         email: session.email,
         role: session.role,
       },
+      isSuperAdmin: session.role === "super_admin",
     });
   } catch (error) {
     console.error("Auth check error:", error);
@@ -65,9 +62,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // Find user by email - only users with admin or super_admin role
+    const user = await prisma.user.findFirst({
+      where: {
+        email,
+        role: {
+          in: ["admin", "super_admin"] as const,
+        },
+        isActive: true,
+      },
       select: {
         id: true,
         email: true,
@@ -78,7 +81,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (!user || !user.isActive) {
+    if (!user) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 },
@@ -123,6 +126,7 @@ export async function POST(request: NextRequest) {
         name: user.name,
         role: user.role,
       },
+      isSuperAdmin: user.role === "super_admin",
     });
   } catch (error) {
     console.error("Login error:", error);
@@ -139,7 +143,8 @@ export async function DELETE() {
       sessions.delete(sessionToken);
     }
 
-    cookieStore.delete(SESSION_COOKIE_NAME);
+    const cookieStoreDelete = await cookies();
+    cookieStoreDelete.delete(SESSION_COOKIE_NAME);
 
     return NextResponse.json({ success: true });
   } catch (error) {

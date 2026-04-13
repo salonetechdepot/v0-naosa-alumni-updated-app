@@ -1,56 +1,70 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Users, Clock, CheckCircle, CreditCard, ArrowRight } from 'lucide-react'
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Users,
+  Clock,
+  CheckCircle,
+  CreditCard,
+  ArrowRight,
+} from "lucide-react";
 
 interface DashboardStats {
-  total: number
-  pending: number
-  approved: number
-  rejected: number
-  totalAmount: number
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  totalAmount: number;
 }
 
 interface PendingMember {
-  id: string
-  firstName: string
-  middleName: string | null
-  surname: string
-  phone: string
-  createdAt: string
+  id: string;
+  firstName: string;
+  middleName: string | null;
+  surname: string;
+  phone: string;
+  createdAt: string;
 }
 
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [recentPending, setRecentPending] = useState<PendingMember[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentPending, setRecentPending] = useState<PendingMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const response = await fetch('/api/admin/dashboard')
-        const result = await response.json()
+        const response = await fetch("/api/admin/dashboard");
+        const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result.error || 'Failed to load dashboard')
+          throw new Error(result.error || "Failed to load dashboard");
         }
 
-        setStats(result.stats)
-        setRecentPending(result.recentPending)
+        setStats(result.stats);
+        setRecentPending(result.recentPending);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+        setError(
+          err instanceof Error ? err.message : "Failed to load dashboard data",
+        );
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
     }
 
-    fetchDashboardData()
-  }, [])
+    fetchDashboardData();
+  }, []);
 
   if (isLoading) {
     return (
@@ -72,7 +86,7 @@ export default function AdminDashboardPage() {
           ))}
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -83,7 +97,7 @@ export default function AdminDashboardPage() {
           <p className="text-destructive">{error}</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -105,7 +119,9 @@ export default function AdminDashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-foreground">{stats?.total || 0}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {stats?.total || 0}
+            </p>
           </CardContent>
         </Card>
 
@@ -117,7 +133,9 @@ export default function AdminDashboardPage() {
             <Clock className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-amber-600">{stats?.pending || 0}</p>
+            <p className="text-2xl font-bold text-amber-600">
+              {stats?.pending || 0}
+            </p>
           </CardContent>
         </Card>
 
@@ -129,7 +147,9 @@ export default function AdminDashboardPage() {
             <CheckCircle className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-primary">{stats?.approved || 0}</p>
+            <p className="text-2xl font-bold text-primary">
+              {stats?.approved || 0}
+            </p>
           </CardContent>
         </Card>
 
@@ -185,7 +205,8 @@ export default function AdminDashboardPage() {
                       {member.firstName} {member.middleName} {member.surname}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {member.phone} | {new Date(member.createdAt).toLocaleDateString()}
+                      {member.phone} |{" "}
+                      {new Date(member.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -209,7 +230,9 @@ export default function AdminDashboardPage() {
                 <Users className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-medium text-foreground">Manage Registrations</p>
+                <p className="font-medium text-foreground">
+                  Manage Registrations
+                </p>
                 <p className="text-sm text-muted-foreground">
                   Review, approve, or reject member registrations
                 </p>
@@ -235,5 +258,5 @@ export default function AdminDashboardPage() {
         </Link>
       </div>
     </div>
-  )
+  );
 }

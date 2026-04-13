@@ -1,6 +1,6 @@
 generator client {
   provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  // previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -21,6 +21,7 @@ enum Gender {
 }
 
 enum UserRole {
+  super_admin
   admin
   member
   user
@@ -88,18 +89,23 @@ model Transaction {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
+  phone        String?  @unique
   password     String
   name         String
   role         UserRole @default(user)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  inviteToken  String?  @unique
+  inviteExpiry DateTime?
 
-  // Link to Member profile - NO @relation attributes here, just the field
+  // Link to Member profile
   memberId     String?  @unique
-  member       Member?  // This creates the relation without extra attributes
+  member       Member?
 
   @@index([email])
+  @@index([phone])
   @@index([role])
   @@index([memberId])
+  @@index([inviteToken])
 }
