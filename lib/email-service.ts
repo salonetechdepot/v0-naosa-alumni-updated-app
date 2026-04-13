@@ -66,7 +66,7 @@ export async function sendUserInvitation(
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <div style="background-color: #4F46E5; padding: 20px; text-align: center;">
+      <div style="background-color: #800e13; padding: 20px; text-align: center;">
         <h1 style="color: white; margin: 0;">Welcome to NAOSA Portal</h1>
       </div>
       
@@ -82,7 +82,7 @@ export async function sendUserInvitation(
         }
         
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${inviteLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+          <a href="${inviteLink}" style="background-color: #800e13; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
             Set Up Your Account
           </a>
         </div>
