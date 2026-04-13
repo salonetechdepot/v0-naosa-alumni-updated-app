@@ -6,11 +6,13 @@ export interface SessionData {
   expiresAt: Date;
 }
 
-// Global session store (shared across all API routes)
-const globalSessions = new Map<string, SessionData>();
+// Use a more persistent session store
+const globalForSession = global as unknown as {
+  sessions: Map<string, SessionData>;
+};
 
-if (!(global as any).sessions) {
-  (global as any).sessions = globalSessions;
+if (!globalForSession.sessions) {
+  globalForSession.sessions = new Map<string, SessionData>();
 }
 
-export const sessions = (global as any).sessions as Map<string, SessionData>;
+export const sessions = globalForSession.sessions;
