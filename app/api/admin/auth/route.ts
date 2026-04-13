@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { sessions } from "@/lib/session-store";
 
+import { UserRole } from "@prisma/client";
+
 const SESSION_COOKIE_NAME = "admin_session";
 const SESSION_DURATION = 24 * 60 * 60 * 1000;
 
@@ -63,11 +65,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Use a type assertion to bypass the TypeScript check
+    // 2. Use the imported Enum values
     const user = await prisma.user.findFirst({
       where: {
         email,
         role: {
-          in: ["admin", "super_admin"] as any, // Type assertion to bypass the check
+          // Use the specific Enum keys defined in your schema
+          in: [UserRole.admin, UserRole.super_admin],
         },
         isActive: true,
       },
