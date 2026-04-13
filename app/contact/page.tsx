@@ -74,7 +74,7 @@ export default function ContactPage() {
             </CardHeader>
             <CardContent>
               <a
-                href="mailto:NAOSAkenema@gmail.com"
+                href="mailto:naosakenema@gmail.com"
                 className="text-lg font-medium text-primary hover:underline"
               >
                 naosakenema@gmail.com
