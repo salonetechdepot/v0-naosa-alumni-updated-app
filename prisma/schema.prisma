@@ -32,6 +32,7 @@ enum UserRole {
 
 model Member {
   id                   String             @id @default(cuid())
+  memberNumber         Int                @unique @default(autoincrement())
   firstName            String
   middleName           String?
   surname              String

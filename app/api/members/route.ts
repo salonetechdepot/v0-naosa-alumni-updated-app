@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
         status: true,
         createdAt: true,
         updatedAt: true,
+        userId: true, // Add this line
       },
     });
 
