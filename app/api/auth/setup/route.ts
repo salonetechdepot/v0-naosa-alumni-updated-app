@@ -1,6 +1,38 @@
+// app/api/auth/setup/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+
+export async function GET(request: NextRequest) {
+  try {
+    const token = request.nextUrl.searchParams.get("token");
+
+    if (!token) {
+      return NextResponse.json({ valid: false }, { status: 400 });
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        inviteToken: token,
+        inviteExpiry: { gt: new Date() },
+      },
+      select: {
+        name: true,
+        email: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json({ valid: false }, { status: 404 });
+    }
+
+    return NextResponse.json({ valid: true, user });
+  } catch (error) {
+    console.error("Error verifying token:", error);
+    return NextResponse.json({ valid: false }, { status: 500 });
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,12 +52,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find user by invite token
     const user = await prisma.user.findFirst({
       where: {
         inviteToken: token,
         inviteExpiry: { gt: new Date() },
-        isActive: true,
       },
     });
 
@@ -36,10 +66,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Update user
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -59,37 +87,5 @@ export async function POST(request: NextRequest) {
       { error: "Internal server error" },
       { status: 500 },
     );
-  }
-}
-
-export async function GET(request: NextRequest) {
-  try {
-    const token = request.nextUrl.searchParams.get("token");
-
-    if (!token) {
-      return NextResponse.json({ valid: false }, { status: 400 });
-    }
-
-    const user = await prisma.user.findFirst({
-      where: {
-        inviteToken: token,
-        inviteExpiry: { gt: new Date() },
-        isActive: true,
-      },
-      select: {
-        name: true,
-        email: true,
-        role: true,
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json({ valid: false }, { status: 404 });
-    }
-
-    return NextResponse.json({ valid: true, user });
-  } catch (error) {
-    console.error("Error verifying token:", error);
-    return NextResponse.json({ valid: false }, { status: 500 });
   }
 }

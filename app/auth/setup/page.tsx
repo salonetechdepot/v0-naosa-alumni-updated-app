@@ -38,6 +38,7 @@ function SetupForm() {
 
     async function verifyToken() {
       try {
+        // FIXED: Use /api/auth/setup instead of /api/admin/setup
         const response = await fetch(`/api/auth/setup?token=${token}`);
         const data = await response.json();
 
@@ -47,7 +48,8 @@ function SetupForm() {
         } else {
           setIsValidToken(false);
         }
-      } catch {
+      } catch (error) {
+        console.error("Token verification error:", error);
         setIsValidToken(false);
       }
     }
@@ -69,6 +71,7 @@ function SetupForm() {
 
     setIsLoading(true);
     try {
+      // FIXED: Use /api/auth/setup instead of /api/admin/setup
       const response = await fetch("/api/auth/setup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -93,6 +96,7 @@ function SetupForm() {
     }
   };
 
+  // Rest of your component remains the same...
   if (isValidToken === null) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">

@@ -71,13 +71,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+// Update the User interface
 interface User {
   id: string;
-  email: string;
+  email: string | null;
   phone: string | null;
   name: string;
   role: string;
   status: "active" | "inactive";
+  source: "user" | "member";
+  memberStatus: string | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
@@ -126,19 +129,19 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, []);
 
+  // Update the filtering - remove the active-only filter
   useEffect(() => {
     if (searchTerm) {
       const filtered = users.filter(
         (user) =>
-          user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (user.phone && user.phone.includes(searchTerm)),
       );
       setFilteredUsers(filtered);
     } else {
       setFilteredUsers(users);
     }
-    setCurrentPage(1); // Reset to first page when search changes
   }, [searchTerm, users]);
 
   // Get current page users
@@ -172,6 +175,49 @@ export default function AdminUsersPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Add a function to get member status badge
+  const getMemberStatusBadge = (status: string | null) => {
+    if (!status) return null;
+    switch (status) {
+      case "approved":
+        return (
+          <Badge className="bg-green-500 hover:bg-green-600">
+            <CheckCircle className="h-3 w-3 mr-1" /> Approved
+          </Badge>
+        );
+      case "rejected":
+        return (
+          <Badge variant="destructive">
+            <XCircle className="h-3 w-3 mr-1" /> Rejected
+          </Badge>
+        );
+      case "pending":
+        return (
+          <Badge variant="secondary" className="bg-amber-500">
+            Pending
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
+
+  // Add source badge
+  const getSourceBadge = (source: string) => {
+    if (source === "member") {
+      return (
+        <Badge variant="outline" className="text-cyan-500 border-cyan-500">
+          Member Application
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-purple-500 border-purple-500">
+        Portal User
+      </Badge>
+    );
   };
 
   const validateEmail = (email: string) => {
@@ -346,9 +392,17 @@ export default function AdminUsersPage() {
         throw new Error(result.error || "Failed to delete user");
       }
 
+      // If the API returns the updated users list, use it
+      if (result.users) {
+        setUsers(result.users);
+        setFilteredUsers(result.users);
+      } else {
+        // Otherwise fetch fresh data
+        await fetchUsers();
+      }
+
       toast.success(`Removed ${userToDelete.name}`);
       setUserToDelete(null);
-      fetchUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
       toast.error(
@@ -683,6 +737,7 @@ export default function AdminUsersPage() {
                       <TableHead>Phone</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Member Status</TableHead>
                       <TableHead>Member Link</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -698,6 +753,9 @@ export default function AdminUsersPage() {
                         <TableCell>{user.phone || "-"}</TableCell>
                         <TableCell>{getRoleBadge(user.role)}</TableCell>
                         <TableCell>{getStatusBadge(user.status)}</TableCell>
+                        <TableCell>
+                          {getMemberStatusBadge(user.memberStatus) || "-"}
+                        </TableCell>
                         <TableCell>
                           {user.memberId ? (
                             <Badge variant="outline" className="text-cyan-500">
