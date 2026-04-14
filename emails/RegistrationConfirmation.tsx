@@ -83,14 +83,14 @@ export const RegistrationConfirmation = ({
             reviewed and approved.
           </Text>
 
-          {/* <Section style={buttonSection}>
+          <Section style={buttonSection}>
             <Button
               style={button}
               href={`${baseUrl}/status?ref=${systemReference}`}
             >
               Check Registration Status
             </Button>
-          </Section> */}
+          </Section>
 
           <Hr style={hr} />
 

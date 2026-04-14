@@ -50,6 +50,7 @@ export async function GET() {
     });
 
     // Format users
+    // For users (from User table)
     const formattedUsers = users.map((user) => ({
       id: user.id,
       email: user.email,
@@ -59,13 +60,14 @@ export async function GET() {
       status: user.isActive ? "active" : "inactive",
       source: "user" as const,
       memberStatus: null,
+      admissionNumber: null, // Users don't have admission numbers directly
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
       lastLoginAt: null,
       memberId: user.memberId,
     }));
 
-    // Format orphaned members as "users" for display
+    // For orphaned members (from Member table)
     const formattedMembers = orphanedMembers.map((member) => ({
       id: member.id,
       email: member.email || null,
@@ -75,6 +77,7 @@ export async function GET() {
       status: member.status === "approved" ? "active" : "inactive",
       source: "member" as const,
       memberStatus: member.status,
+      admissionNumber: member.admissionNumber || null,
       createdAt: member.createdAt.toISOString(),
       updatedAt: member.createdAt.toISOString(),
       lastLoginAt: null,

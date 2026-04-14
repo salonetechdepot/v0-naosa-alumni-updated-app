@@ -81,10 +81,11 @@ interface User {
   status: "active" | "inactive";
   source: "user" | "member";
   memberStatus: string | null;
+  admissionNumber: string | null; // Add this
+  memberId: string | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
-  memberId: string | null;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -119,6 +120,9 @@ export default function AdminUsersPage() {
   const [editPhone, setEditPhone] = useState("");
   const [editRole, setEditRole] = useState("");
   const [editStatus, setEditStatus] = useState<"active" | "inactive">("active");
+  // Add after other edit state variables
+  const [editAdmissionNumber, setEditAdmissionNumber] = useState("");
+  const [editMemberStatus, setEditMemberStatus] = useState("pending");
 
   // Password reset state
   const [newPassword, setNewPassword] = useState("");
@@ -306,16 +310,24 @@ export default function AdminUsersPage() {
     if (!selectedUser) return;
 
     try {
+      const updateData: any = {
+        name: editName,
+        email: editEmail,
+        phone: editPhone || null,
+        role: editRole,
+        isActive: editStatus === "active",
+      };
+
+      // If this is a member record, include member-specific fields
+      if (selectedUser.source === "member") {
+        updateData.admissionNumber = editAdmissionNumber || null;
+        updateData.memberStatus = editMemberStatus;
+      }
+
       const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editName,
-          email: editEmail,
-          phone: editPhone || null,
-          role: editRole,
-          isActive: editStatus === "active",
-        }),
+        body: JSON.stringify(updateData),
       });
 
       const result = await response.json();
@@ -414,10 +426,12 @@ export default function AdminUsersPage() {
   const openEditDialog = (user: User) => {
     setSelectedUser(user);
     setEditName(user.name);
-    setEditEmail(user.email);
+    setEditEmail(user.email || "");
     setEditPhone(user.phone || "");
     setEditRole(user.role);
     setEditStatus(user.status);
+    setEditAdmissionNumber(user.admissionNumber || "");
+    setEditMemberStatus(user.memberStatus || "pending");
     setIsEditDialogOpen(true);
   };
 
@@ -737,6 +751,8 @@ export default function AdminUsersPage() {
                       <TableHead>Phone</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Admission Number</TableHead>
+                      <TableHead>Member ID</TableHead>
                       <TableHead>Member Status</TableHead>
                       <TableHead>Member Link</TableHead>
                       <TableHead>Created</TableHead>
@@ -753,6 +769,16 @@ export default function AdminUsersPage() {
                         <TableCell>{user.phone || "-"}</TableCell>
                         <TableCell>{getRoleBadge(user.role)}</TableCell>
                         <TableCell>{getStatusBadge(user.status)}</TableCell>
+                        <TableCell>{user.admissionNumber || "-"}</TableCell>
+                        <TableCell>
+                          {user.memberId ? (
+                            <span className="font-mono text-xs">
+                              {user.memberId.slice(-8)}
+                            </span>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
                         <TableCell>
                           {getMemberStatusBadge(user.memberStatus) || "-"}
                         </TableCell>
@@ -864,7 +890,213 @@ export default function AdminUsersPage() {
       </Card>
 
       {/* Edit User Dialog */}
+      {/* Edit User Dialog - Complete Version */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit User - Complete Details</DialogTitle>
+            <DialogDescription>
+              Update all user information. Fields marked with * are required.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Basic Information */}
+            <div className="border-b pb-2">
+              <h4 className="font-medium text-foreground mb-3">
+                Basic Information
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-name">Full Name *</Label>
+                  <Input
+                    id="edit-name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-role">Role *</Label>
+                  <Select value={editRole} onValueChange={setEditRole}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="support">Support</SelectItem>
+                      <SelectItem value="volunteer">Volunteer</SelectItem>
+                      <SelectItem value="donor">Donor</SelectItem>
+                      <SelectItem value="member">Member</SelectItem>
+                      <SelectItem value="user">User</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="border-b pb-2">
+              <h4 className="font-medium text-foreground mb-3">
+                Contact Information
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email Address *</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone">Phone Number</Label>
+                  <Input
+                    id="edit-phone"
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="+232-XX-XXXXXX"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Member Specific Information (only show for member records) */}
+            {selectedUser?.source === "member" && (
+              <div className="border-b pb-2">
+                <h4 className="font-medium text-foreground mb-3">
+                  Member Information
+                </h4>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-admissionNumber">
+                      Admission Number
+                    </Label>
+                    <Input
+                      id="edit-admissionNumber"
+                      value={editAdmissionNumber}
+                      onChange={(e) => setEditAdmissionNumber(e.target.value)}
+                      placeholder="e.g., 5432"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional - must be unique if provided
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-memberStatus">Member Status</Label>
+                    <Select
+                      value={editMemberStatus}
+                      onValueChange={setEditMemberStatus}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="approved">Approved</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Label htmlFor="edit-memberId">Member ID</Label>
+                  <Input
+                    id="edit-memberId"
+                    value={selectedUser?.memberId || ""}
+                    disabled
+                    className="bg-muted font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This field is read-only
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Account Status */}
+            <div className="border-b pb-2">
+              <h4 className="font-medium text-foreground mb-3">
+                Account Status
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status">Account Status</Label>
+                  <Select
+                    value={editStatus}
+                    onValueChange={(value: "active" | "inactive") =>
+                      setEditStatus(value)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Created Date</Label>
+                  <Input
+                    value={
+                      selectedUser ? formatDate(selectedUser.createdAt) : ""
+                    }
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* User ID Information */}
+            <div>
+              <h4 className="font-medium text-foreground mb-3">
+                System Information
+              </h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>User ID</Label>
+                  <Input
+                    value={selectedUser?.id || ""}
+                    disabled
+                    className="bg-muted font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Source</Label>
+                  <Input
+                    value={
+                      selectedUser?.source === "member"
+                        ? "Member Application"
+                        : "Portal User"
+                    }
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleEditUser}>
+              <Save className="mr-2 h-4 w-4" />
+              Save All Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
@@ -954,7 +1186,7 @@ export default function AdminUsersPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* Reset Password Dialog */}
       <Dialog

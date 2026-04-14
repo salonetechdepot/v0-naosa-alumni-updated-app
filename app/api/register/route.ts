@@ -83,6 +83,22 @@ export async function POST(request: Request) {
       );
     }
 
+    // Inside the POST handler, after checking existing member
+    if (data.admissionNumber) {
+      const existingAdmissionNumber = await prisma.member.findUnique({
+        where: {
+          admissionNumber: data.admissionNumber,
+        },
+      });
+
+      if (existingAdmissionNumber) {
+        return NextResponse.json(
+          { error: "Admission number already registered" },
+          { status: 409 },
+        );
+      }
+    }
+
     // Create member and transaction in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create member with standardized amount

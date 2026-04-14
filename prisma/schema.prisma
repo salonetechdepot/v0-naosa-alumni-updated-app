@@ -39,7 +39,7 @@ model Member {
   currentAddress       String
   city                 String?
   country              String?            @default("Sierra Leone")
-  admissionNumber      String?
+  admissionNumber      String?            @unique
   dateOfEntry          DateTime
   dateOfExit           DateTime?
   email                String?            @unique
